@@ -22,12 +22,19 @@ export default function LoginPage() {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                 });
                 if (error) throw error;
-                setMessage("注册成功！请检查邮箱验证链接。");
+
+                // 如果关闭了邮箱验证，signUp 会直接返回 session
+                if (data.session) {
+                    router.push("/");
+                    router.refresh();
+                } else {
+                    setMessage("注册成功！请检查邮箱验证链接。");
+                }
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
