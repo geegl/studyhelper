@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         // 构建请求参数
         const method = "POST";
         const canonicalUri = "/";
-        const queryString = ""; // CutType 放到 query 也可以，但本 API 推荐 body 传图 + query 传参
+        const queryString = "Action=RecognizeEduPaperCut&CutType=question";
         const nonce = crypto.randomUUID();
         const dateISO = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"); // 2026-02-20T03:30:00Z
 
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         headers["authorization"] = authorization;
 
         // 发送请求
-        const url = `https://${ENDPOINT}/?Action=${ACTION}&CutType=question`;
+        const url = `https://${ENDPOINT}/?${queryString}`;
 
         const response = await fetch(url, {
             method: "POST",
