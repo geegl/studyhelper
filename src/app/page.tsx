@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Camera, Image as ImageIcon, Loader2, RefreshCcw, Clock, User, LogOut } from "lucide-react";
 import AnswerCard from "@/components/AnswerCard";
+import ImageCropper from "@/components/ImageCropper";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase-browser";
 import imageCompression from "browser-image-compression";
@@ -17,11 +18,12 @@ interface AnswerData {
   practice: string;
 }
 
-type Stage = "idle" | "compressing" | "ocr" | "solving" | "done" | "error";
+type Stage = "idle" | "compressing" | "cropping" | "ocr" | "solving" | "done" | "error";
 
 export default function Home() {
   const { user, signOut } = useAuth();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [rawImage, setRawImage] = useState<string | null>(null); // 压缩后的原始大图（裁剪前）
   const [stage, setStage] = useState<Stage>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [answerData, setAnswerData] = useState<AnswerData | null>(null);
@@ -44,6 +46,7 @@ export default function Home() {
   const stageLabels: Record<Stage, string> = {
     idle: "",
     compressing: "正在压缩图片...",
+    cropping: "请框选题目区域",
     ocr: "正在提取试卷文字...",
     solving: "DeepSeek V3 正在推理解答...",
     done: "✅ 解析完成",
@@ -67,58 +70,12 @@ export default function Home() {
         useWebWorker: true,
       });
 
-      // 2. 读取并预览
+      // 2. 读取并进入裁剪模式
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = (event) => {
         const base64 = event.target?.result as string;
-        setSelectedImage(base64);
-
-        try {
-          // 3. OCR
-          setStage("ocr");
-          const ocrRes = await fetch("/api/ocr", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: base64 }),
-          });
-          const ocrData = await ocrRes.json();
-
-          if (!ocrRes.ok || !ocrData.success) {
-            throw new Error(ocrData.error || "OCR 识别失败");
-          }
-
-          const questions: string[] = ocrData.questions || [];
-          if (questions.length === 0) {
-            throw new Error("未能从图片中识别出题目文字，请换一张更清晰的照片");
-          }
-
-          // 4. AI 解答
-          setStage("solving");
-          const questionText = questions.join("\n\n");
-          const solveRes = await fetch("/api/solve", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: [
-                { role: "user", content: `请解答以下高考题：\n\n${questionText}` },
-              ],
-            }),
-          });
-          const solveData = await solveRes.json();
-
-          if (!solveRes.ok || !solveData.success) {
-            throw new Error(solveData.error || "AI 解答失败");
-          }
-
-          setAnswerData(solveData.data);
-          setStage("done");
-
-          // 保存到历史记录
-          saveToHistory(questionText, solveData.data);
-        } catch (err: any) {
-          setErrorMsg(err.message || "处理过程中出错");
-          setStage("error");
-        }
+        setRawImage(base64);
+        setStage("cropping");
       };
       reader.readAsDataURL(compressed);
     } catch {
@@ -127,8 +84,58 @@ export default function Home() {
     }
   };
 
+  // 裁剪确认后开始 OCR + AI 解答
+  const processImage = async (croppedBase64: string) => {
+    setSelectedImage(croppedBase64);
+    setRawImage(null);
+    setStage("ocr");
+
+    try {
+      const ocrRes = await fetch("/api/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: croppedBase64 }),
+      });
+      const ocrData = await ocrRes.json();
+
+      if (!ocrRes.ok || !ocrData.success) {
+        throw new Error(ocrData.error || "OCR 识别失败");
+      }
+
+      const questions: string[] = ocrData.questions || [];
+      if (questions.length === 0) {
+        throw new Error("未能从图片中识别出题目文字，请换一张更清晰的照片");
+      }
+
+      setStage("solving");
+      const questionText = questions.join("\n\n");
+      const solveRes = await fetch("/api/solve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "user", content: `请解答以下高考题：\n\n${questionText}` },
+          ],
+        }),
+      });
+      const solveData = await solveRes.json();
+
+      if (!solveRes.ok || !solveData.success) {
+        throw new Error(solveData.error || "AI 解答失败");
+      }
+
+      setAnswerData(solveData.data);
+      setStage("done");
+      saveToHistory(questionText, solveData.data);
+    } catch (err: any) {
+      setErrorMsg(err.message || "处理过程中出错");
+      setStage("error");
+    }
+  };
+
   const resetAll = () => {
     setSelectedImage(null);
+    setRawImage(null);
     setAnswerData(null);
     setErrorMsg("");
     setStage("idle");
@@ -245,6 +252,15 @@ export default function Home() {
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* 裁剪模式全屏覆盖 */}
+      {stage === "cropping" && rawImage && (
+        <ImageCropper
+          imageSrc={rawImage}
+          onCropConfirm={processImage}
+          onCancel={resetAll}
+        />
       )}
     </main>
   );
