@@ -19,8 +19,9 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
     const [imgLayout, setImgLayout] = useState({ x: 0, y: 0, width: 0, height: 0, naturalWidth: 0, naturalHeight: 0 });
-    const [points, setPoints] = useState<Point[]>([]);
-    const [isDrawing, setIsDrawing] = useState(false);
+    const pointsRef = useRef<Point[]>([]);
+    const [isDrawingUI, setIsDrawingUI] = useState(false);
+    const isDrawingRef = useRef(false);
     const [hasDrawn, setHasDrawn] = useState(false);
 
     // 图片加载后计算布局
@@ -84,14 +85,16 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
         e.preventDefault();
         const pos = getRelativePos(e);
         if (!pos) return;
-        setIsDrawing(true);
+        isDrawingRef.current = true;
+        setIsDrawingUI(true);
         setHasDrawn(false);
-        setPoints([pos]);
+        pointsRef.current = [pos];
+        drawCanvas();
     };
 
     // 绘制移动
     const handleDrawMove = useCallback((e: TouchEvent | MouseEvent) => {
-        if (!isDrawing) return;
+        if (!isDrawingRef.current) return;
         e.preventDefault();
 
         const container = containerRef.current;
@@ -110,19 +113,22 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
         const x = Math.max(0, Math.min(imgLayout.width, clientX - rect.left - imgLayout.x));
         const y = Math.max(0, Math.min(imgLayout.height, clientY - rect.top - imgLayout.y));
 
-        setPoints(prev => [...prev, { x, y }]);
-    }, [isDrawing, imgLayout]);
+        pointsRef.current.push({ x, y });
+        requestAnimationFrame(drawCanvas);
+    }, [imgLayout]);
 
     // 绘制结束
     const handleDrawEnd = useCallback(() => {
-        if (!isDrawing) return;
-        setIsDrawing(false);
+        if (!isDrawingRef.current) return;
+        isDrawingRef.current = false;
+        setIsDrawingUI(false);
         setHasDrawn(true);
-    }, [isDrawing]);
+        drawCanvas(); // 最终重绘触发闭合和高亮
+    }, []);
 
-    // 全局事件监听
+    // 全局事件监听（只有在 drawing 时才绑定，但由于 ref 变化不触发重新绑定，我们需要依赖 isDrawingUI 绑定）
     useEffect(() => {
-        if (!isDrawing) return;
+        if (!isDrawingUI) return;
         const onMove = (e: TouchEvent | MouseEvent) => handleDrawMove(e);
         const onEnd = () => handleDrawEnd();
         window.addEventListener("touchmove", onMove, { passive: false });
@@ -135,10 +141,10 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
             window.removeEventListener("touchend", onEnd);
             window.removeEventListener("mouseup", onEnd);
         };
-    }, [isDrawing, handleDrawMove, handleDrawEnd]);
+    }, [isDrawingUI, handleDrawMove, handleDrawEnd]);
 
-    // 绘制画布
-    useEffect(() => {
+    // 独立出绘制函数
+    const drawCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas || imgLayout.width === 0) return;
 
@@ -149,6 +155,7 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        const points = pointsRef.current;
         if (points.length < 2) return;
 
         // 绘制路径
@@ -184,10 +191,16 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
             ctx.lineJoin = "round";
             ctx.stroke();
         }
-    }, [points, hasDrawn, imgLayout]);
+    }, [imgLayout.width, imgLayout.height, hasDrawn]); // 依赖项改为尺寸和完成状态
+
+    // 窗口尺寸改变或图片加载完成时重绘
+    useEffect(() => {
+        drawCanvas();
+    }, [drawCanvas, imgLayout]);
 
     // 计算包围盒
     const getBoundingBox = () => {
+        const points = pointsRef.current;
         if (points.length < 3) return null;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const p of points) {
@@ -231,8 +244,9 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
 
     // 重画
     const redraw = () => {
-        setPoints([]);
+        pointsRef.current = [];
         setHasDrawn(false);
+        drawCanvas(); // 清理画布
     };
 
     return (

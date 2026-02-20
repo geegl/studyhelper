@@ -58,6 +58,9 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 清空 input value，以便重复选择同个文件能再次触发 onChange
+    e.target.value = "";
+
     // 清除历史状态
     setAnswerData(null);
     setErrorMsg("");
