@@ -100,6 +100,27 @@ export async function POST(req: Request) {
             }
         }
 
+        // --- 类型强制拉平护城河 ---
+        // 大模型经常会无视 "所有字段必须为字符串" 的 Prompt，尤其在有多小问的时候把 answer 和 explanation 写成嵌套对象。
+        // 这里我们对所有期望是 string 的字段进行强制类型转换与扁平化，防止前端渲染 Crash。
+        const stringFields = ["summary", "answer", "explanation", "analysis", "derivation", "practice"];
+        for (const field of stringFields) {
+            if (parsed && parsed[field] !== undefined) {
+                if (typeof parsed[field] === "object" && parsed[field] !== null) {
+                    try {
+                        // 将自作聪明的嵌套 JSON Object 拉平成一段好读的文本段落，例如 "1: xxx\n2: yyy"
+                        parsed[field] = Object.entries(parsed[field])
+                            .map(([k, v]) => `**${k}**: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                            .join("\n\n");
+                    } catch {
+                        parsed[field] = String(parsed[field]);
+                    }
+                } else {
+                    parsed[field] = String(parsed[field] || "");
+                }
+            }
+        }
+
         return NextResponse.json({
             success: true,
             data: parsed,
