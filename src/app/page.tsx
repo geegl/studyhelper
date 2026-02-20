@@ -56,10 +56,21 @@ export default function Home() {
           }
 
           // 4. 调用大模型进行解答
-          const ocrContent = JSON.stringify(data.data);
+          const questions: string[] = data.questions || [];
+
+          let promptContent: string;
+          if (questions.length > 0) {
+            promptContent = questions.length === 1
+              ? `请解答以下高考题：\n\n${questions[0]}`
+              : `请依次解答以下 ${questions.length} 道高考题：\n\n${questions.map((q: string, i: number) => `【第${i + 1}题】${q}`).join("\n\n")}`;
+          } else {
+            // fallback：如果题目提取为空，把原始数据也传过去
+            promptContent = `请解答这道高考题，以下是 OCR 识别的原始数据，请从中提取题目并解答：\n\n${JSON.stringify(data.rawData)}`;
+          }
+
           await append({
             role: "user",
-            content: `请解答这道高考题，这是识别出来的原始数据：\n${ocrContent}`,
+            content: promptContent,
           });
         } catch (err: any) {
           setOcrError(err.message || "后端接口未响应或出错");

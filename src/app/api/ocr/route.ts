@@ -142,9 +142,34 @@ export async function POST(req: NextRequest) {
         // 解析响应
         const data = JSON.parse(responseText);
 
+        // Data 可能是 JSON 字符串，需要二次解析
+        let ocrData = data.Data;
+        if (typeof ocrData === "string") {
+            try {
+                ocrData = JSON.parse(ocrData);
+            } catch {
+                // 如果解析失败，直接当文本使用
+            }
+        }
+
+        // 从 page_list → subject_list 中提取纯文本题目
+        const questions: string[] = [];
+        if (ocrData?.page_list) {
+            for (const page of ocrData.page_list) {
+                if (page.subject_list) {
+                    for (const subject of page.subject_list) {
+                        if (subject.text) {
+                            questions.push(subject.text);
+                        }
+                    }
+                }
+            }
+        }
+
         return NextResponse.json({
             success: true,
-            data: data.Data,
+            questions,             // 提取出的纯文本题目数组
+            rawData: ocrData,      // 原始结构化数据（备用）
         });
     } catch (error: any) {
         console.error("OCR Error:", error.message || error);
