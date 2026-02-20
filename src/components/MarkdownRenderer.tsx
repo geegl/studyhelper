@@ -13,22 +13,21 @@ interface MarkdownRendererProps {
  * 例如 \boxed{C} → $\boxed{C}$，\frac{1}{2} → $\frac{1}{2}$
  */
 function preprocessLatex(text: string): string {
-    // 匹配独立的裸 LaTeX 命令（不在 $ 内的），包裹成 $...$
-    // 处理 \boxed{...}、\frac{...}{...}、\sqrt{...} 等带花括号的命令
+    // 匹配独立的裸 LaTeX 命令（不在 $ 内的）
+    // 注意：移动端 Safari < 16.4 不支持 (?<!\\$)，改用捕获前导字符处理
     text = text.replace(
-        /(?<!\$)\\(boxed|frac|sqrt|int|sum|prod|lim|infty|left|right|begin|end)\b/g,
-        (match, command, offset) => {
-            // 检查前面是否已经有 $ 符号
-            const before = text.substring(Math.max(0, offset - 5), offset);
-            if (before.includes('$')) return match;
-            return match; // 不在这里处理，用下面更完整的逻辑
+        /(^|[^$])\\(boxed|frac|sqrt|int|sum|prod|lim|infty|left|right|begin|end)\b/g,
+        (match, prefix, command, offset) => {
+            const before = text.substring(Math.max(0, offset - 4), offset);
+            if (before.includes('$') || prefix === '$') return match;
+            return match; // 不在这里处理，留给下方处理
         }
     );
 
     // 处理裸 \boxed{...} ：找到完整的 \boxed{...} 并包裹
     text = text.replace(
-        /(?<!\$)\\boxed\{([^}]*)\}(?!\$)/g,
-        (match) => `$${match}$`
+        /(^|[^$])\\boxed\{([^}]*)\}(?!\$)/g,
+        (match, prefix, content) => `${prefix}$\\boxed{${content}}$`
     );
 
     return text;
