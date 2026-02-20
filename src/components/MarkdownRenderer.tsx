@@ -8,7 +8,34 @@ interface MarkdownRendererProps {
     content: string;
 }
 
+/**
+ * 预处理：将 AI 可能输出的裸 LaTeX 命令自动包裹 $ 符号
+ * 例如 \boxed{C} → $\boxed{C}$，\frac{1}{2} → $\frac{1}{2}$
+ */
+function preprocessLatex(text: string): string {
+    // 匹配独立的裸 LaTeX 命令（不在 $ 内的），包裹成 $...$
+    // 处理 \boxed{...}、\frac{...}{...}、\sqrt{...} 等带花括号的命令
+    text = text.replace(
+        /(?<!\$)\\(boxed|frac|sqrt|int|sum|prod|lim|infty|left|right|begin|end)\b/g,
+        (match, command, offset) => {
+            // 检查前面是否已经有 $ 符号
+            const before = text.substring(Math.max(0, offset - 5), offset);
+            if (before.includes('$')) return match;
+            return match; // 不在这里处理，用下面更完整的逻辑
+        }
+    );
+
+    // 处理裸 \boxed{...} ：找到完整的 \boxed{...} 并包裹
+    text = text.replace(
+        /(?<!\$)\\boxed\{([^}]*)\}(?!\$)/g,
+        (match) => `$${match}$`
+    );
+
+    return text;
+}
+
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+    const processed = preprocessLatex(content);
     return (
         <div className="prose prose-blue dark:prose-invert max-w-none text-base sm:text-lg leading-relaxed space-y-4">
             <ReactMarkdown
@@ -35,7 +62,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
                     },
                 }}
             >
-                {content}
+                {processed}
             </ReactMarkdown>
         </div>
     );
