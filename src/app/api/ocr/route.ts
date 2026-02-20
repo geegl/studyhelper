@@ -123,11 +123,16 @@ export async function POST(req: NextRequest) {
         // 发送请求
         const url = `https://${ENDPOINT}/?${queryString}`;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s 超时
+
         const response = await fetch(url, {
             method: "POST",
             headers,
             body: bodyBuffer,
+            signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         const responseText = await response.text();
 

@@ -55,10 +55,12 @@ export async function POST(req: Request) {
         // 尝试解析 JSON
         let parsed;
         try {
-            // 去掉可能的 ```json 包裹
+            // 取出第一个 { 和最后一个 } 之间的内容，忽略模型可能的闲聊前缀或后缀
             let cleaned = result.text.trim();
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+            const firstBrace = cleaned.indexOf("{");
+            const lastBrace = cleaned.lastIndexOf("}");
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                cleaned = cleaned.substring(firstBrace, lastBrace + 1);
             }
             parsed = JSON.parse(cleaned);
         } catch {
