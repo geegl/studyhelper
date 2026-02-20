@@ -1,23 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import OcrApi20210707, * as $OcrApi20210707 from "@alicloud/ocr-api20210707";
-import * as $OpenApi from "@alicloud/openapi-client";
-import * as $Util from "@alicloud/tea-util";
+import crypto from "crypto";
 
-export const maxDuration = 30; // 允许较长的执行时间
+export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * 初始化阿里云 OCR 客户端
+ * 阿里云 ACS v3 签名 — 纯 fetch 实现，无需 @alicloud/* SDK
+ * 参考：https://help.aliyun.com/document_detail/China/China20210707/China-Doc-Gateways/China.html
  */
-function createClient(): OcrApi20210707 {
-    const config = new $OpenApi.Config({
-        accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID,
-        accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET,
-    });
-    // 访问的域名
-    config.endpoint = "ocr-api.cn-hangzhou.aliyuncs.com";
-    return new OcrApi20210707(config);
+
+const ENDPOINT = "ocr-api.cn-hangzhou.aliyuncs.com";
+const API_VERSION = "2021-07-07";
+const ACTION = "RecognizeEduPaperCut";
+
+function sha256Hex(data: string | Buffer): string {
+    return crypto.createHash("sha256").update(data).digest("hex");
+}
+
+function hmacSha256(key: string, data: string): string {
+    return crypto.createHmac("sha256", key).update(data).digest("hex");
+}
+
+function buildAuthorization(
+    accessKeyId: string,
+    accessKeySecret: string,
+    method: string,
+    canonicalUri: string,
+    queryString: string,
+    headers: Record<string, string>,
+    signedHeaderKeys: string[],
+    hashedPayload: string
+): string {
+    // 1. 规范化请求头
+    const canonicalHeaders = signedHeaderKeys
+        .map((k) => `${k}:${headers[k]}`)
+        .join("\n") + "\n";
+    const signedHeadersStr = signedHeaderKeys.join(";");
+
+    // 2. 规范化请求
+    const canonicalRequest = [
+        method,
+        canonicalUri,
+        queryString,
+        canonicalHeaders,
+        signedHeadersStr,
+        hashedPayload,
+    ].join("\n");
+
+    // 3. 待签名字符串
+    const stringToSign = `ACS3-HMAC-SHA256\n${sha256Hex(canonicalRequest)}`;
+
+    // 4. 计算签名
+    const signature = hmacSha256(accessKeySecret, stringToSign);
+
+    return `ACS3-HMAC-SHA256 Credential=${accessKeyId},SignedHeaders=${signedHeadersStr},Signature=${signature}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -31,28 +68,83 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (!process.env.ALIYUN_ACCESS_KEY_ID || !process.env.ALIYUN_ACCESS_KEY_SECRET) {
+        const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
+        const accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
+
+        if (!accessKeyId || !accessKeySecret) {
             return NextResponse.json(
                 { error: "Aliyun credentials are not configured" },
                 { status: 500 }
             );
         }
 
-        const client = createClient();
+        // 准备请求体 (纯 base64 二进制流)
+        const rawBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        const bodyBuffer = Buffer.from(rawBase64, "base64");
 
-        // 使用教育试卷切图识别
-        const request = new $OcrApi20210707.RecognizeEduPaperCutRequest({
-            body: imageBase64.replace(/^data:image\/\w+;base64,/, ""), // 移除前缀
-            cutType: "question", // 切分题目
+        // 构建请求参数
+        const method = "POST";
+        const canonicalUri = "/";
+        const queryString = ""; // CutType 放到 query 也可以，但本 API 推荐 body 传图 + query 传参
+        const nonce = crypto.randomUUID();
+        const dateISO = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"); // 2026-02-20T03:30:00Z
+
+        // 对 body 做 SHA256
+        const hashedPayload = sha256Hex(bodyBuffer);
+
+        // 设置请求头
+        const headers: Record<string, string> = {
+            "content-type": "application/octet-stream",
+            "host": ENDPOINT,
+            "x-acs-action": ACTION,
+            "x-acs-content-sha256": hashedPayload,
+            "x-acs-date": dateISO,
+            "x-acs-signature-nonce": nonce,
+            "x-acs-version": API_VERSION,
+        };
+
+        // 需要签名的头部键（按字母序已排好）
+        const signedHeaderKeys = Object.keys(headers).sort();
+
+        // 生成 Authorization
+        const authorization = buildAuthorization(
+            accessKeyId,
+            accessKeySecret,
+            method,
+            canonicalUri,
+            queryString,
+            headers,
+            signedHeaderKeys,
+            hashedPayload
+        );
+
+        headers["authorization"] = authorization;
+
+        // 发送请求
+        const url = `https://${ENDPOINT}/?Action=${ACTION}&CutType=question`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: bodyBuffer,
         });
-        const runtime = new $Util.RuntimeOptions({});
 
-        const response = await client.recognizeEduPaperCutWithOptions(request, runtime);
+        const responseText = await response.text();
 
-        // 返回识别内容
+        if (!response.ok) {
+            console.error("Alicloud OCR Error Response:", response.status, responseText);
+            return NextResponse.json(
+                { error: "OCR service returned error", details: responseText },
+                { status: response.status }
+            );
+        }
+
+        // 解析响应
+        const data = JSON.parse(responseText);
+
         return NextResponse.json({
             success: true,
-            data: response.body?.data,
+            data: data.Data,
         });
     } catch (error: any) {
         console.error("OCR Error:", error.message || error);
