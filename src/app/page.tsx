@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, Image as ImageIcon, Loader2, RefreshCcw } from "lucide-react";
+import { Camera, Image as ImageIcon, Loader2, RefreshCcw, Clock, User, LogOut } from "lucide-react";
 import AnswerCard from "@/components/AnswerCard";
+import { useAuth } from "@/components/AuthProvider";
+import { createClient } from "@/lib/supabase-browser";
 import imageCompression from "browser-image-compression";
+import Link from "next/link";
 
 interface AnswerData {
   summary: string;
@@ -17,10 +20,26 @@ interface AnswerData {
 type Stage = "idle" | "compressing" | "ocr" | "solving" | "done" | "error";
 
 export default function Home() {
+  const { user, signOut } = useAuth();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [answerData, setAnswerData] = useState<AnswerData | null>(null);
+  const supabase = createClient();
+
+  // 保存到历史记录
+  const saveToHistory = async (questionText: string, answer: AnswerData) => {
+    if (!user) return;
+    try {
+      await supabase.from("history").insert({
+        user_id: user.id,
+        question_text: questionText,
+        answer,
+      });
+    } catch (err) {
+      console.error("Failed to save history:", err);
+    }
+  };
 
   const stageLabels: Record<Stage, string> = {
     idle: "",
@@ -93,6 +112,9 @@ export default function Home() {
 
           setAnswerData(solveData.data);
           setStage("done");
+
+          // 保存到历史记录
+          saveToHistory(questionText, solveData.data);
         } catch (err: any) {
           setErrorMsg(err.message || "处理过程中出错");
           setStage("error");
@@ -132,6 +154,28 @@ export default function Home() {
               </p>
             </div>
 
+            {/* 用户导航 */}
+            <div className="flex items-center justify-center gap-4 text-sm">
+              {user ? (
+                <>
+                  <Link href="/history" className="flex items-center gap-1.5 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                    <Clock className="w-4 h-4" />
+                    历史记录
+                  </Link>
+                  <span className="text-gray-200 dark:text-gray-700">|</span>
+                  <button onClick={signOut} className="flex items-center gap-1.5 text-gray-500 hover:text-red-500 dark:text-gray-400 transition-colors">
+                    <LogOut className="w-4 h-4" />
+                    退出
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline">
+                  <User className="w-4 h-4" />
+                  登录以保存历史记录
+                </Link>
+              )}
+            </div>
+
             <div className="w-full flex flex-col gap-4 mt-8">
               <label className="relative flex items-center justify-center gap-3 w-full bg-blue-600 hover:bg-blue-700 text-white p-5 rounded-2xl font-semibold text-lg cursor-pointer transition-all active:scale-95 shadow-xl shadow-blue-600/20">
                 <Camera className="w-6 h-6" />
@@ -163,8 +207,8 @@ export default function Home() {
               )}
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium ${stage === "done" ? "text-green-600 dark:text-green-400" :
-                    stage === "error" ? "text-red-600 dark:text-red-400" :
-                      "text-blue-600 dark:text-blue-400"
+                  stage === "error" ? "text-red-600 dark:text-red-400" :
+                    "text-blue-600 dark:text-blue-400"
                   } flex items-center gap-1.5`}>
                   {isWorking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {stageLabels[stage]}
