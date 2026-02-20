@@ -208,25 +208,40 @@ export default function Home() {
         <div className="flex flex-col flex-1 pb-24">
           {/* 顶部状态栏 */}
           <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-4 shadow-sm">
-            <div className="max-w-3xl mx-auto flex items-center gap-4">
-              {selectedImage && (
-                <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={selectedImage} alt="题目" className="w-full h-full object-cover" />
+            <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                {selectedImage && (
+                  <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selectedImage} alt="题目" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${stage === "done" ? "text-green-600 dark:text-green-400" :
+                    stage === "error" ? "text-red-600 dark:text-red-400" :
+                      "text-blue-600 dark:text-blue-400"
+                    } flex items-center gap-1.5`}>
+                    {isWorking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {stageLabels[stage]}
+                  </p>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${stage === "done" ? "text-green-600 dark:text-green-400" :
-                  stage === "error" ? "text-red-600 dark:text-red-400" :
-                    "text-blue-600 dark:text-blue-400"
-                  } flex items-center gap-1.5`}>
-                  {isWorking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {stageLabels[stage]}
-                </p>
               </div>
-              <button onClick={resetAll} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="重新出题">
-                <RefreshCcw className="w-5 h-5" />
-              </button>
+
+              {/* 操作按钮组 */}
+              <div className="flex items-center gap-2 shrink-0">
+                {user ? (
+                  <Link href="/history" className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="历史记录">
+                    <Clock className="w-5 h-5" />
+                  </Link>
+                ) : (
+                  <Link href="/login" className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="登录 / 注册">
+                    <User className="w-5 h-5" />
+                  </Link>
+                )}
+                <button onClick={resetAll} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="重新出题">
+                  <RefreshCcw className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
