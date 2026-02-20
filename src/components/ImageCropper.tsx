@@ -221,7 +221,8 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
     // 确认裁剪
     const confirmCrop = () => {
         const bbox = getBoundingBox();
-        if (!bbox || !imgRef.current) return;
+        const points = pointsRef.current;
+        if (!bbox || !imgRef.current || points.length < 3) return;
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -237,7 +238,24 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
 
         canvas.width = sw;
         canvas.height = sh;
+
+        // 先全部填充为白色背景（被裁减掉的多边形外部将保持白色）
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sw, sh);
+
+        // 创建多边形剪裁路径
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo((points[0].x - bbox.x) * scaleX, (points[0].y - bbox.y) * scaleY);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo((points[i].x - bbox.x) * scaleX, (points[i].y - bbox.y) * scaleY);
+        }
+        ctx.closePath();
+        ctx.clip(); // 限制后续的绘制只在这个多边形内生效
+
+        // 绘制实际的图片（只显示剪裁路径内的部分）
         ctx.drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.restore();
 
         onCropConfirm(canvas.toDataURL("image/jpeg", 0.9));
     };
