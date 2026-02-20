@@ -62,17 +62,42 @@ export async function POST(req: Request) {
             if (firstBrace !== -1 && lastBrace !== -1) {
                 cleaned = cleaned.substring(firstBrace, lastBrace + 1);
             }
+
+            // --- 强化清洗逻辑 ---
+            // 很多时候大模型为了排版公式，会输出形如 \frac 或者真实的换行符，
+            // 导致 JSON.parse 因为不规范的反斜杠或换行直接报错。
+            // 1. 我们先将真正的物理换行变成转义的 \\n，以便 JSON 支持。
+            cleaned = cleaned.replace(/\n/g, "\\n").replace(/\r/g, "");
+
+            // 2. 将非法的不可见控制字符剔除，不含回车换行（上面已转义处理）
+            cleaned = cleaned.replace(/[\u0000-\u0009\u000B-\u000C\u000E-\u001F]+/g, "");
+
             parsed = JSON.parse(cleaned);
         } catch {
-            // 如果解析失败，将整段文本作为 derivation 返回
-            parsed = {
-                summary: "题目解析",
-                answer: "详见推导",
-                explanation: "请查看分步推导获取完整解答",
-                analysis: "",
-                derivation: result.text,
-                practice: "",
-            };
+            // 最后抢救措施：如果大模型 JSON 被截断（没输出完），尝试补齐结尾
+            try {
+                let rescue = result.text.trim();
+                const firstBrace = rescue.indexOf("{");
+                if (firstBrace !== -1) {
+                    rescue = rescue.substring(firstBrace);
+                    // 补充可能的未闭合格式
+                    rescue = rescue.replace(/\n/g, "\\n").replace(/\r/g, "");
+                    rescue += '"}';
+                    parsed = JSON.parse(rescue);
+                } else {
+                    throw new Error("No JSON structure found");
+                }
+            } catch {
+                // 如果解析彻底失败，将整段文本作为 derivation 强制返回兜底
+                parsed = {
+                    summary: "大模型格式异常",
+                    answer: "详见推导",
+                    explanation: "因大模型输出格式化错误，以下为直接捕获的内容",
+                    analysis: "",
+                    derivation: result.text,
+                    practice: "",
+                };
+            }
         }
 
         return NextResponse.json({
