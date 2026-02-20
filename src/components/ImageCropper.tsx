@@ -220,9 +220,24 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
 
     // 确认裁剪
     const confirmCrop = () => {
+        // --- 新增：如果用户没有画线圈选，直接提交整张图片 ---
+        if (!hasDrawn || pointsRef.current.length < 3) {
+            if (!imgRef.current) return;
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            // 直接以原图尺寸导出
+            canvas.width = imgLayout.naturalWidth;
+            canvas.height = imgLayout.naturalHeight;
+            ctx.drawImage(imgRef.current, 0, 0);
+            onCropConfirm(canvas.toDataURL("image/jpeg", 0.9));
+            return;
+        }
+
+        // --- 已画线的处理逻辑 ---
         const bbox = getBoundingBox();
         const points = pointsRef.current;
-        if (!bbox || !imgRef.current || points.length < 3) return;
+        if (!bbox || !imgRef.current) return;
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -272,7 +287,7 @@ export default function ImageCropper({ imageSrc, onCropConfirm, onCancel }: Imag
             {/* 顶部提示 */}
             <div className="bg-black/80 text-white text-center py-3 px-4 text-sm flex items-center justify-center gap-2">
                 <Pencil className="w-4 h-4" />
-                {hasDrawn ? "黄色虚线框为裁剪区域，确认或重画" : "用手指画圈选题目区域"}
+                {hasDrawn ? "黄色虚线框为裁剪区域，确认或重画" : "画圈选题或直接点 ✔️ 识别全图"}
             </div>
 
             {/* 图片 + 画布 */}
