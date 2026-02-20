@@ -142,8 +142,15 @@ export async function POST(req: NextRequest) {
         // 解析响应
         const data = JSON.parse(responseText);
 
+        // 调试日志：打印响应结构的 keys 和 Data 类型
+        console.log("OCR Response keys:", Object.keys(data));
+        console.log("OCR data.Data type:", typeof data.Data, "| data.data type:", typeof data.data);
+        console.log("OCR Response preview:", responseText.substring(0, 500));
+
+        // Data 字段可能大写也可能小写，兼容处理
+        let ocrData = data.Data ?? data.data;
+
         // Data 可能是 JSON 字符串，需要二次解析
-        let ocrData = data.Data;
         if (typeof ocrData === "string") {
             try {
                 ocrData = JSON.parse(ocrData);
@@ -151,6 +158,8 @@ export async function POST(req: NextRequest) {
                 // 如果解析失败，直接当文本使用
             }
         }
+
+        console.log("Parsed ocrData type:", typeof ocrData, "| has page_list:", !!ocrData?.page_list);
 
         // 从 page_list → subject_list 中提取纯文本题目
         const questions: string[] = [];
@@ -164,6 +173,11 @@ export async function POST(req: NextRequest) {
                     }
                 }
             }
+        }
+
+        console.log("Extracted questions count:", questions.length);
+        if (questions.length > 0) {
+            console.log("First question preview:", questions[0].substring(0, 100));
         }
 
         return NextResponse.json({
