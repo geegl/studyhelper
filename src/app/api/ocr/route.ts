@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         // 构建请求参数
         const method = "POST";
         const canonicalUri = "/";
-        const queryString = "Action=RecognizeEduPaperCut&CutType=question&ImageType=0";
+        const queryString = "Action=RecognizeEduPaperCut&CutType=question&ImageType=photo";
         const nonce = crypto.randomUUID();
         const dateISO = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"); // 2026-02-20T03:30:00Z
 
