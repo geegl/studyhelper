@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase-browser";
 import { ArrowLeft, Trash2, Clock } from "lucide-react";
 import Link from "next/link";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+import AnswerCard from "@/components/AnswerCard";
 
 interface HistoryItem {
     id: string;
@@ -14,6 +14,9 @@ interface HistoryItem {
         summary: string;
         answer: string;
         explanation: string;
+        analysis: string;
+        derivation: string;
+        practice: string;
     };
     created_at: string;
 }
@@ -107,33 +110,22 @@ export default function HistoryPage() {
                     records.map((r) => (
                         <div
                             key={r.id}
-                            className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm"
+                            className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm relative group"
                         >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                                        {r.answer?.summary || "题目解析"}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
-                                            答案
-                                        </span>
-                                        <span className="font-bold text-gray-900 dark:text-white text-lg">
-                                            <MarkdownRenderer content={r.answer?.answer || ""} />
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mt-2">
-                                        {formatDate(r.created_at)}
-                                    </p>
-                                </div>
+                            <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={() => deleteRecord(r.id)}
-                                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors shrink-0"
-                                    title="删除"
+                                    className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-500 rounded-lg transition-colors"
+                                    title="删除此记录"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>
+                            <div className="mb-4 flex items-center gap-2 text-xs text-gray-400">
+                                <Clock className="w-3.5 h-3.5" />
+                                {formatDate(r.created_at)}
+                            </div>
+                            <AnswerCard data={r.answer} ocrText={r.question_text} />
                         </div>
                     ))
                 )}

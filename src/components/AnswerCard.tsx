@@ -14,6 +14,7 @@ interface AnswerData {
 
 interface AnswerCardProps {
     data: AnswerData;
+    ocrText?: string;
 }
 
 const TABS = [
@@ -24,17 +25,29 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export default function AnswerCard({ data }: AnswerCardProps) {
+export default function AnswerCard({ data, ocrText }: AnswerCardProps) {
     const [activeTab, setActiveTab] = useState<TabKey | null>(null);
 
     const tabContent = activeTab ? data[activeTab] : "";
 
     return (
         <div className="space-y-4">
-            {/* 顶部：摘要 + 答案 + 一句话解释 */}
+            {/* 顶部：OCR 原文 + 摘要 + 答案 + 一句话解释 */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                {/* OCR 识别原文展示 */}
+                {ocrText && (
+                    <div className="mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+                        <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                            OCR 识别完整题目原文
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-gray-300 font-serif leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-pointer" title="点击展开/收起完整题目">
+                            {ocrText}
+                        </div>
+                    </div>
+                )}
+
                 {/* 题目摘要 */}
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 font-medium">
                     {data.summary}
                 </p>
 
@@ -69,8 +82,8 @@ export default function AnswerCard({ data }: AnswerCardProps) {
                                 )
                             }
                             className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 text-sm font-medium transition-all ${activeTab === tab.key
-                                    ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 border-b-2 border-blue-600 dark:border-blue-400"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 border-b-2 border-blue-600 dark:border-blue-400"
+                                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                 }`}
                         >
                             <span>{tab.icon}</span>

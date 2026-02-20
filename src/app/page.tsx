@@ -26,6 +26,7 @@ export default function Home() {
   const [rawImage, setRawImage] = useState<string | null>(null); // 压缩后的原始大图（裁剪前）
   const [stage, setStage] = useState<Stage>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [ocrText, setOcrText] = useState<string>(""); // 保存 OCR 识别出的文本
   const [answerData, setAnswerData] = useState<AnswerData | null>(null);
   const supabase = createClient();
 
@@ -109,6 +110,7 @@ export default function Home() {
 
       setStage("solving");
       const questionText = questions.join("\n\n");
+      setOcrText(questionText);
       const solveRes = await fetch("/api/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,6 +138,7 @@ export default function Home() {
   const resetAll = () => {
     setSelectedImage(null);
     setRawImage(null);
+    setOcrText("");
     setAnswerData(null);
     setErrorMsg("");
     setStage("idle");
@@ -239,7 +242,7 @@ export default function Home() {
           {/* 答案卡片 */}
           <div className="flex-1 max-w-3xl mx-auto w-full p-4 mt-2">
             {answerData ? (
-              <AnswerCard data={answerData} />
+              <AnswerCard data={answerData} ocrText={ocrText} />
             ) : isWorking ? (
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500 space-y-4">
