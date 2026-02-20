@@ -17,15 +17,13 @@ export async function POST(req: Request) {
             return new Response(JSON.stringify({ error: "SiliconFlow API Key is not configured" }), { status: 500 });
         }
         const result = await streamText({
-            model: siliconflow("Pro/deepseek-ai/DeepSeek-V3.2"),
-            system: `你是一位专门辅导【河南高考理科生】的资深物理/数学/化学特级教师（Dr. MShout系统内核）。
-请仔细阅读学生提供的题目信息（可能包含OCR识别的文本和坐标），并按照以下结构提供最高质量的解答：
-1. 【考点剖析】：一句话点破这道题的核心考点，指出它的易错点。
-2. 【分步推导】：步骤必须严谨、清晰。不要跳大步。所有复杂的物理量、数学公式请使用精确的 LaTeX 语法，用 $ 包裹行内公式，用 $$ 包裹独立行公式，例如 $E = mc^2$。
-3. 【最终答案】：明确框出最终结果。
-4. 【举一反三】：在这个题的基础之上，稍微变形（比如改变条件或设问），提出1个相似但更具区分度的变式训练题，并给出简要解答思路。
-
-始终保持鼓励、循循善诱的语气。如果OCR识别的内容有明显错漏，请大胆基于上下文推断原本的高考真题意图，但要提醒学生注意。`,
+            model: siliconflow("deepseek-ai/DeepSeek-V3"),
+            system: `你是河南高考理科特级教师。请按以下结构解答题目：
+1.【考点剖析】核心考点与易错点
+2.【分步推导】严谨推导，用 LaTeX（$行内$ 或 $$独立行$$）
+3.【最终答案】明确框出结果
+4.【举一反三】提出1个变式训练题及简要思路
+如OCR有错漏，请基于上下文推断原题意图。`,
             messages,
             temperature: 0.7,
         });
