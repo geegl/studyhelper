@@ -4,6 +4,8 @@ import * as $OpenApi from "@alicloud/openapi-client";
 import * as $Util from "@alicloud/tea-util";
 
 export const maxDuration = 30; // 允许较长的执行时间
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
  * 初始化阿里云 OCR 客户端
