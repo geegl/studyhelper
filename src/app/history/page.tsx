@@ -66,7 +66,7 @@ export default function HistoryPage() {
 
     if (authLoading || loading) {
         return (
-            <main className="flex items-center justify-center min-h-[100dvh] bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
+            <main className="flex items-center justify-center min-h-screen-safe bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
                 <div className="text-gray-400 animate-pulse">加载中...</div>
             </main>
         );
@@ -74,7 +74,7 @@ export default function HistoryPage() {
 
     if (!user) {
         return (
-            <main className="flex flex-col items-center justify-center min-h-[100dvh] bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background p-6 text-center">
+            <main className="flex flex-col items-center justify-center min-h-screen-safe bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background p-6 text-center">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">请先登录以查看历史记录</p>
                 <Link href="/login" className="text-blue-600 font-medium hover:underline">
                     去登录
@@ -84,7 +84,7 @@ export default function HistoryPage() {
     }
 
     return (
-        <main className="min-h-[100dvh] bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
+        <main className="min-h-screen-safe bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
             {/* 顶栏 */}
             <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-3">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">

@@ -150,7 +150,7 @@ export default function Home() {
   const isWorking = stage === "compressing" || stage === "ocr" || stage === "solving";
 
   return (
-    <main className="flex flex-col min-h-[100dvh] bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
+    <main className="flex flex-col min-h-screen-safe bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-background">
       {/* 欢迎入口 */}
       {stage === "idle" && !selectedImage && (
         <div className="flex flex-col items-center justify-center flex-1 p-6">
