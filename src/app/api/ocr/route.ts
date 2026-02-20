@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 const ENDPOINT = "ocr-api.cn-hangzhou.aliyuncs.com";
 const API_VERSION = "2021-07-07";
-const ACTION = "RecognizeEduPaperCut";
+const ACTION = "RecognizeEduPaperOcr";
 
 function sha256Hex(data: string | Buffer): string {
     return crypto.createHash("sha256").update(data).digest("hex");
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         // 构建请求参数
         const method = "POST";
         const canonicalUri = "/";
-        const queryString = "Action=RecognizeEduPaperCut&CutType=question&ImageType=photo";
+        const queryString = "Action=RecognizeEduPaperOcr&ImageType=photo&Subject=default";
         const nonce = crypto.randomUUID();
         const dateISO = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"); // 2026-02-20T03:30:00Z
 
@@ -142,12 +142,7 @@ export async function POST(req: NextRequest) {
         // 解析响应
         const data = JSON.parse(responseText);
 
-        // 调试日志：打印响应结构的 keys 和 Data 类型
-        console.log("OCR Response keys:", Object.keys(data));
-        console.log("OCR data.Data type:", typeof data.Data, "| data.data type:", typeof data.data);
-        console.log("OCR Response preview:", responseText.substring(0, 500));
-
-        // Data 字段可能大写也可能小写，兼容处理
+        // Data 字段兼容大小写
         let ocrData = data.Data ?? data.data;
 
         // Data 可能是 JSON 字符串，需要二次解析
@@ -155,35 +150,32 @@ export async function POST(req: NextRequest) {
             try {
                 ocrData = JSON.parse(ocrData);
             } catch {
-                // 如果解析失败，直接当文本使用
+                // 解析失败则将整个字符串作为识别内容
             }
         }
 
-        console.log("Parsed ocrData type:", typeof ocrData, "| has page_list:", !!ocrData?.page_list);
-
-        // 从 page_list → subject_list 中提取纯文本题目
-        const questions: string[] = [];
-        if (ocrData?.page_list) {
-            for (const page of ocrData.page_list) {
-                if (page.subject_list) {
-                    for (const subject of page.subject_list) {
-                        if (subject.text) {
-                            questions.push(subject.text);
-                        }
-                    }
-                }
-            }
+        // RecognizeEduPaperOcr 返回 content 字段，包含全部识别文本
+        let fullText = "";
+        if (typeof ocrData === "object" && ocrData?.content) {
+            fullText = ocrData.content;
+        } else if (typeof ocrData === "string") {
+            fullText = ocrData;
         }
 
-        console.log("Extracted questions count:", questions.length);
-        if (questions.length > 0) {
-            console.log("First question preview:", questions[0].substring(0, 100));
+        // 如果 content 为空，尝试从 prism_wordsInfo 中拼接
+        if (!fullText && ocrData?.prism_wordsInfo) {
+            fullText = ocrData.prism_wordsInfo
+                .map((w: any) => w.word)
+                .join("\n");
         }
+
+        console.log("OCR recognized text length:", fullText.length);
+        console.log("OCR text preview:", fullText.substring(0, 200));
 
         return NextResponse.json({
             success: true,
-            questions,             // 提取出的纯文本题目数组
-            rawData: ocrData,      // 原始结构化数据（备用）
+            questions: fullText ? [fullText] : [],
+            rawData: ocrData,
         });
     } catch (error: any) {
         console.error("OCR Error:", error.message || error);
