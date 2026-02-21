@@ -69,27 +69,46 @@ export async function POST(req: Request) {
 
             parsed = JSON.parse(cleaned);
         } catch {
-            // 最后抢救措施：如果大模型 JSON 被截断（没输出完），尝试补齐结尾
+            // 传统正则替换往往会误伤且很难修复括号不匹配问题。
+            // 听取您的建议：我们在此引入“AI 二次兜底修复机制”
             try {
-                let rescue = result.text.trim();
-                const firstBrace = rescue.indexOf("{");
-                if (firstBrace !== -1) {
-                    rescue = rescue.substring(firstBrace);
-                    // 剔除控制字符并补充闭合格式
-                    rescue = rescue.replace(/[\u0000-\u0009\u000B-\u000C\u000E-\u001F]+/g, "");
-                    rescue += '"}';
-                    parsed = JSON.parse(rescue);
-                } else {
-                    throw new Error("No JSON structure found");
+                console.log("Direct JSON parse failed. Triggering AI JSON repair...");
+                const fixResult = await generateText({
+                    model: siliconflow("deepseek-ai/DeepSeek-V3"),
+                    system: `你是一个负责数据清洗与 JSON 实体修复的 AI。以下是一段原本打算输出为 JSON，但因为含有发疯式的非法物理换行、反斜杠逃逸错误、或者是被意外截断等导致了语法崩坏的文本。
+你的唯一任务是：提取这些内容里残存的逻辑，重新梳理出结构完美合法的 JSON。
+【严重警告】：
+1. 绝不要有任何前置或后置对话闲聊。
+2. 绝对不能使用 \`\`\`json 标记，输出必须且仅仅以 { 开始，以 } 结束。
+3. 如果输入文本实在太乱无法识别，请尽你所能去推演并填充 JSON 字段。
+【强制结构】：必需且只包含 "summary", "answer", "explanation", "analysis", "derivation", "practice" 这6个键，且每一个键对应的值**必须是扁平的字符串（String）**。
+如果有嵌套对象例如 {"1":"...", "2":"..."}，请将它们在对应值里合并为字符串 "1: ...\\n2: ..."。
+【转义安全】：如果内容存在数学公式或大段文本，请务必保证输出合法的被转义的 \\n，严禁在 JSON 字符串值中间输出物理真实回车换行！`,
+                    prompt: `请提取以下出错文本中的信息，合并嵌套字典为字符串，并转换为符合要求的合法 JSON：\n\n${result.text}`,
+                    temperature: 0.1, // 极低温度保证结构严谨性
+                });
+
+                let fixedClean = fixResult.text.trim();
+                const ffirst = fixedClean.indexOf("{");
+                const flast = fixedClean.lastIndexOf("}");
+                if (ffirst !== -1 && flast !== -1) {
+                    fixedClean = fixedClean.substring(ffirst, flast + 1);
                 }
-            } catch {
-                // 如果解析彻底失败，将整段文本作为 derivation 强制返回兜底
+
+                // 去除可能存在的不可见控制字符保护
+                fixedClean = fixedClean.replace(/[\u0000-\u0009\u000B-\u000C\u000E-\u001F]+/g, "");
+
+                parsed = JSON.parse(fixedClean);
+                console.log("AI JSON repair succeeded!");
+            } catch (error) {
+                console.error("AI JSON repair also failed", error);
+                // 假如连大模型智能修复也报语法错，做最终的安全托底
                 parsed = {
-                    summary: "大模型格式异常",
+                    summary: "大模型格式异常且修复失败",
                     answer: "详见推导",
-                    explanation: "因大模型输出格式化错误，以下为直接捕获的内容",
+                    explanation: "因输出格式化错误，且二次 AI 智能联想修复也发生了解析失败，以下为读出的原内容",
                     analysis: "",
-                    derivation: result.text,
+                    derivation: result.text, // 回退到使用原内容
                     practice: "",
                 };
             }
