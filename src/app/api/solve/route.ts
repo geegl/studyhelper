@@ -86,6 +86,7 @@ export async function POST(req: Request) {
 【转义安全】：如果内容存在数学公式或大段文本，请务必保证输出合法的被转义的 \\n，严禁在 JSON 字符串值中间输出物理真实回车换行！`,
                     prompt: `请提取以下出错文本中的信息，合并嵌套字典为字符串，并转换为符合要求的合法 JSON：\n\n${result.text}`,
                     temperature: 0.1, // 极低温度保证结构严谨性
+                    abortSignal: AbortSignal.timeout(12000), // 限制修复最多占用12秒，以防触发 Vercel 整体 60s 强杀
                 });
 
                 let fixedClean = fixResult.text.trim();

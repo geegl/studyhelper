@@ -123,7 +123,20 @@ export default function Home() {
           ],
         }),
       });
-      const solveData = await solveRes.json();
+      const solveText = await solveRes.text();
+      let solveData;
+      try {
+        solveData = JSON.parse(solveText);
+      } catch (err) {
+        if (!solveRes.ok) {
+          throw new Error(
+            solveRes.status === 504
+              ? "服务器处理超时，请长按题目截图只框选核心区域重试"
+              : `服务器异常 (${solveRes.status}): ${solveText.substring(0, 40)}...`
+          );
+        }
+        throw new Error("大模型返回值解析失败，请重试");
+      }
 
       if (!solveRes.ok || !solveData.success) {
         throw new Error(solveData.error || "AI 解答失败");
@@ -220,10 +233,10 @@ export default function Home() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${stage === "done" ? "text-green-600 dark:text-green-400" :
+                  <p className={`text - sm font - medium ${stage === "done" ? "text-green-600 dark:text-green-400" :
                     stage === "error" ? "text-red-600 dark:text-red-400" :
                       "text-blue-600 dark:text-blue-400"
-                    } flex items-center gap-1.5`}>
+                    } flex items - center gap - 1.5`}>
                     {isWorking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {stageLabels[stage]}
                   </p>
