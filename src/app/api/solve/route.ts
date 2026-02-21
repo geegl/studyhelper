@@ -64,12 +64,7 @@ export async function POST(req: Request) {
             }
 
             // --- 强化清洗逻辑 ---
-            // 很多时候大模型为了排版公式，会输出形如 \frac 或者真实的换行符，
-            // 导致 JSON.parse 因为不规范的反斜杠或换行直接报错。
-            // 1. 我们先将真正的物理换行变成转义的 \\n，以便 JSON 支持。
-            cleaned = cleaned.replace(/\n/g, "\\n").replace(/\r/g, "");
-
-            // 2. 将非法的不可见控制字符剔除，不含回车换行（上面已转义处理）
+            // 剔除非法的不可见控制字符（除了正常的回车换行，剔除 ASCII 0-31 之间的其他字符）
             cleaned = cleaned.replace(/[\u0000-\u0009\u000B-\u000C\u000E-\u001F]+/g, "");
 
             parsed = JSON.parse(cleaned);
@@ -80,8 +75,8 @@ export async function POST(req: Request) {
                 const firstBrace = rescue.indexOf("{");
                 if (firstBrace !== -1) {
                     rescue = rescue.substring(firstBrace);
-                    // 补充可能的未闭合格式
-                    rescue = rescue.replace(/\n/g, "\\n").replace(/\r/g, "");
+                    // 剔除控制字符并补充闭合格式
+                    rescue = rescue.replace(/[\u0000-\u0009\u000B-\u000C\u000E-\u001F]+/g, "");
                     rescue += '"}';
                     parsed = JSON.parse(rescue);
                 } else {
