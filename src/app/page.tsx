@@ -163,6 +163,24 @@ export default function Home() {
       }
 
       // --- 在客户端解析累积的 JSON ---
+      // 状态机修复器：精准替换 JSON 字符串值内的物理换行符
+      // 之前用全局 .replace(/\n/g, "\\n") 会破坏 JSON 结构性换行，这里只修复字符串内部的
+      const fixJsonStringNewlines = (text: string): string => {
+        let result = "";
+        let inString = false;
+        let escaped = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (escaped) { result += ch; escaped = false; continue; }
+          if (ch === "\\") { result += ch; escaped = true; continue; }
+          if (ch === '"') { inString = !inString; result += ch; continue; }
+          if (inString && ch === "\n") { result += "\\n"; continue; }
+          if (inString && ch === "\r") { continue; }
+          result += ch;
+        }
+        return result;
+      };
+
       let parsed;
       try {
         let cleaned = accumulated.trim();
@@ -171,7 +189,14 @@ export default function Home() {
         if (firstBrace !== -1 && lastBrace !== -1) {
           cleaned = cleaned.substring(firstBrace, lastBrace + 1);
         }
-        parsed = JSON.parse(cleaned);
+        // 先尝试直接解析
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          // 直接解析失败，用状态机修复字符串内的换行后重试
+          const fixed = fixJsonStringNewlines(cleaned);
+          parsed = JSON.parse(fixed);
+        }
       } catch {
         // 解析失败时，直接把原始文本作为推导内容展示
         parsed = {
