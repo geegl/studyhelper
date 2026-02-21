@@ -32,13 +32,18 @@ export default function Home() {
 
   // 保存到历史记录
   const saveToHistory = async (questionText: string, answer: AnswerData) => {
-    if (!user) return;
+    if (!user || !supabase) return;
     try {
-      await supabase.from("history").insert({
+      const { error } = await supabase.from("history").insert({
         user_id: user.id,
         question_text: questionText,
         answer,
       });
+      if (error) {
+        console.error("Supabase insert error:", error.message, error.details);
+      } else {
+        console.log("History saved successfully");
+      }
     } catch (err) {
       console.error("Failed to save history:", err);
     }
