@@ -1,8 +1,9 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import { NextResponse } from "next/server";
 
-export const maxDuration = 60;
+// 使用 Edge Runtime！Edge 函数的流式响应不受 60 秒限制
+// 只要数据流在持续传输，连接就不会被 Vercel 切断
+export const runtime = "edge";
 
 const siliconflow = createOpenAI({
     baseURL: "https://api.siliconflow.cn/v1",
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
         const { messages } = await req.json();
 
         if (!process.env.SILICONFLOW_API_KEY) {
-            return NextResponse.json({ error: "SiliconFlow API Key is not configured" }, { status: 500 });
+            return Response.json({ error: "SiliconFlow API Key is not configured" }, { status: 500 });
         }
 
         const userMessage = messages?.[messages.length - 1]?.content || "";
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
         return result.toDataStreamResponse();
     } catch (error: any) {
         console.error("DeepSeek Error:", error);
-        return NextResponse.json(
+        return Response.json(
             { error: "Failed to generate solution", details: error.message },
             { status: 500 }
         );
