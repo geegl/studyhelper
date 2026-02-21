@@ -123,28 +123,83 @@ export default function Home() {
           ],
         }),
       });
-      const solveText = await solveRes.text();
-      let solveData;
-      try {
-        solveData = JSON.parse(solveText);
-      } catch (err) {
-        if (!solveRes.ok) {
-          throw new Error(
-            solveRes.status === 504
-              ? "服务器处理超时，请长按题目截图只框选核心区域重试"
-              : `服务器异常 (${solveRes.status}): ${solveText.substring(0, 40)}...`
-          );
+
+      if (!solveRes.ok) {
+        const errText = await solveRes.text();
+        throw new Error(`服务器异常 (${solveRes.status}): ${errText.substring(0, 60)}`);
+      }
+
+      // --- 流式读取 AI SDK 的 Data Stream ---
+      const reader = solveRes.body?.getReader();
+      if (!reader) throw new Error("无法读取流式响应");
+
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        // AI SDK Data Stream 协议：每行格式为 "0:token_text\n"
+        // 我们需要提取纯文本内容
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("0:")) {
+            try {
+              // 0: 后面跟的是 JSON 编码的字符串片段
+              const tokenText = JSON.parse(line.substring(2));
+              accumulated += tokenText;
+            } catch {
+              // 如果解析单行失败，直接拼接原始内容
+              accumulated += line.substring(2);
+            }
+          }
         }
-        throw new Error("大模型返回值解析失败，请重试");
       }
 
-      if (!solveRes.ok || !solveData.success) {
-        throw new Error(solveData.error || "AI 解答失败");
+      // --- 在客户端解析累积的 JSON ---
+      let parsed;
+      try {
+        let cleaned = accumulated.trim();
+        const firstBrace = cleaned.indexOf("{");
+        const lastBrace = cleaned.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+        }
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // 解析失败时，直接把原始文本作为推导内容展示
+        parsed = {
+          summary: "解析完成（格式自动修复）",
+          answer: "详见推导",
+          explanation: "大模型返回格式异常，已自动提取原始内容",
+          analysis: "",
+          derivation: accumulated,
+          practice: "",
+        };
       }
 
-      setAnswerData(solveData.data);
+      // 类型强制拉平：防止嵌套对象导致渲染崩溃
+      const stringFields = ["summary", "answer", "explanation", "analysis", "derivation", "practice"];
+      for (const field of stringFields) {
+        if (parsed[field] !== undefined) {
+          if (typeof parsed[field] === "object" && parsed[field] !== null) {
+            try {
+              parsed[field] = Object.entries(parsed[field])
+                .map(([k, v]) => `**${k}**: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                .join("\n\n");
+            } catch {
+              parsed[field] = String(parsed[field]);
+            }
+          } else {
+            parsed[field] = String(parsed[field] || "");
+          }
+        }
+      }
+
+      setAnswerData(parsed);
       setStage("done");
-      saveToHistory(questionText, solveData.data);
+      saveToHistory(questionText, parsed);
     } catch (err: any) {
       setErrorMsg(err.message || "处理过程中出错");
       setStage("error");
