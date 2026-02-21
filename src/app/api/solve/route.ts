@@ -19,9 +19,11 @@ export async function POST(req: Request) {
 
         const userMessage = messages?.[messages.length - 1]?.content || "";
 
-        const result = await generateText({
-            model: siliconflow("deepseek-ai/DeepSeek-V3"),
-            system: `你是河南高考理科特级教师。
+        let result;
+        try {
+            result = await generateText({
+                model: siliconflow("deepseek-ai/DeepSeek-V3"),
+                system: `你是河南高考理科特级教师。
 
 【输出格式 - 极其重要】
 你必须严格按以下 JSON 格式输出，不要输出任何其他内容：
@@ -48,9 +50,25 @@ export async function POST(req: Request) {
 - practice：1个变式训练题及解答思路
 
 如OCR有错漏，请推断原题意图。只输出 JSON，不要包含 \`\`\`json 标记。`,
-            prompt: userMessage,
-            temperature: 0.7,
-        });
+                prompt: userMessage,
+                temperature: 0.7,
+                abortSignal: AbortSignal.timeout(45000), // Vercel 免费版底线 60s，为主力解答预留最高 45 秒，超时强行熔断
+            });
+        } catch (error: any) {
+            console.warn("First round AI generation timed out or failed:", error.name);
+            // 首次大模型超时，强行拼装成一段可展示的结果
+            return NextResponse.json({
+                success: true,
+                data: {
+                    summary: "服务器生成超时",
+                    answer: "请重试",
+                    explanation: "因大模型推理负载过高或题目过于复杂，耗时超过安全极限 45秒 被系统截断拦截。请您只圈选最核心的单个题目后再次尝试！",
+                    analysis: "服务器负载高峰超时，建议重试",
+                    derivation: "服务器生成超时，请换一张只包含单道题目的无杂质图片重试。",
+                    practice: "",
+                }
+            });
+        }
 
         // 尝试解析 JSON
         let parsed;
